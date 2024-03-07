@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+		<title>ToDo list</title>
+		<style>
+			.m{
+			margin:0px;
+			}
+			.inp{
+			width:80%;
+			margin-right:5%;
+			}
+			.lab{
+			white-space: pre-wrap;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="row border m" id="top">
+			<div class="col-sm-1"></div>
+			<div class="col-sm-1"><h5><abbr title="May not be the same in the database">ID</abbr></h5></div>
+			<div class="col-sm-6"><h5>Task</h5></div>
+			<div class="col-sm-1"><h5>Date</h5></div>
+			<div class="col-sm-1"><h5>Time</h5></div>
+			<div class="col-sm-1"><h5></h5></div>
+			<div class="col-sm-1"><h5>State</h5></div>
+		</div>
+		<div class="row text-center pt-5">
+			<div class = "col-sm-4">
+				<button type="button" class="btn-light" onclick="loadTasks()">Load tasks</button>
+			</div>
+			<div class = "col-sm-4">
+				<button type="button" id="new_t" class="btn-light" onclick="addTask()">New task</button>
+			</div>
+			<div class = "col-sm-4">
+				<button type="button" class="btn-light" onclick="saveTasks()">Save tasks</button>
+			</div>
+		</div>
+		<script src="../static/script.js"></script>
+	</body>
+</html>
