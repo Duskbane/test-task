@@ -93,23 +93,45 @@ def gets():
     # same applies to functions below
     return render_template("ToDo.html") 
 
-@app.route('/add', methods=['POST'])
+@app.route('/add', methods=['POST', 'GET'])
 def getTask():
-    requestData = request.get_json()
+    if request.method == 'POST':
+        requestData = request.get_json()
+        
+        newTask = getTaskDataFromRequest(requestData)
     
-    newTask = getTaskDataFromRequest(requestData)
-    taskList.append(newTask)
-    return render_template("ToDo.html")
+        conn = connectToDatabase(databaseInfo)
+        cursor = conn.cursor()
+    
+        cursor.execute("INSERT INTO tasks (text, date, state) \
+                        VALUES ('%s', '%s', %s);" %(newTask.info, newTask.date, newTask.state))
+        conn.close()
+        
+        return render_template("ToDo.html")
+    # id
+    if request.method == 'GET':
+        conn = connectToDatabase(databaseInfo)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM tasks ORDER BY id DESC LIMIT 1")
+        task = cursor.fetchone()
+        
+        conn.close()
+        return json.dumps(task[0])
 
 @app.route('/change', methods=['POST'])
 def changeState():
     requestData = request.get_json()
+
+    conn = connectToDatabase(databaseInfo)
+    cursor = conn.cursor()
     
-    modifiedTask = getTaskDataFromRequest(requestData)
-    for i in range(len(taskList)):
-        if taskList[i].id == modifiedTask.id:
-            taskList[i] = modifiedTask
-            break
+    cursor.execute("UPDATE tasks \
+                    SET state = ('%s') \
+                    WHERE id = ('%s'); \
+                    " %( requestData['state'], int(requestData['id_t'])) )
+
+    conn.close()
     return render_template("ToDo.html")
 
 @app.route('/delete', methods=['POST'])
@@ -118,27 +140,11 @@ def deleteTask():
     
     # this time request only returns id
     taskIDToDelete = requestData
-    for i in range(len(taskList)):
-        # conversion id to string only needed here, because
-        # in the functions above ids are being compared to ids
-        # and taskIDToDelete is an int
-        if str(taskList[i].id) == taskIDToDelete:
-            del taskList[i]
-            break
-    return render_template("ToDo.html")
 
-@app.route('/save', methods=['POST'])
-def saveTasks():
-    requestData = request.get_json()
-    
-    # example data - [{'id_t': '5', 'text': 'fwerqr', 'date': '2024-03-06T14:53:00.328Z', 'state': False}]
     conn = connectToDatabase(databaseInfo)
     cursor = conn.cursor()
+    cursor.execute("DELETE FROM tasks WHERE id = ('%s');" %(taskIDToDelete))
 
-    for i in requestData:
-        cursor.execute("INSERT INTO tasks (text, date, state) \
-                        VALUES ('%s', '%s', %s);" %(i['text'], i['date'], i['state']))
-    conn.close()
     return render_template("ToDo.html")
 
 @app.route('/load', methods=['GET'])
@@ -149,8 +155,7 @@ def loadTasks():
     
     cursor.execute("SELECT * FROM tasks")
     tasks = cursor.fetchall()
-    
-    cursor.execute("DELETE FROM tasks")
+
     conn.close()
     
     # tasks - tuple, so date can't be just swapped like tasks[2] = newDate

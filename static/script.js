@@ -1,6 +1,9 @@
 let id = 0;
 let tasks = [];
 
+// on loading a page
+loadTasks();
+
 class Task {
 	constructor(id_t, text, date, state) {
 		this.id_t = id_t;
@@ -40,10 +43,9 @@ function addTask() {
 		new_cell.innerHTML = "";
 		cells.push(new_cell);
 	}
-	
+
+	cells[1].innerHTML = "";
 	cells[2].className = "col-sm-6";
-	cells[1].id = ++id;
-	cells[1].innerHTML = id;
 	cells[2].innerHTML = '<input class="inp lab" id ="in"\
 		placeholder="What do you want to do?" autofocus></input> \
 		<button class="btn-light" id="btn_cnf" onclick="confirmTask()">Confirm</button>';
@@ -94,31 +96,50 @@ function confirmTask() {
 	label.nextElementSibling.nextElementSibling.innerHTML = time;
 
 	// default state for a task if false (not done)
-	let newTask = new Task(label.parentElement.firstElementChild.nextElementSibling.id, text, now, false);
+	let newTask = new Task(0, text, now, false);
 	tasks.push(newTask);
-	
-	// send new task to app.py
-	///////////////////////////////////////////////////
-	// does not produce an error, but does it work?
-	fetch('/add', {
+	// send new task to db
+	sendTask(newTask);
+}
+async function sendTask(newTask){
+	await fetch('/add', {
 		"method": "POST",
 		"headers": {"Content-Type": "application/json"},
 		"body": JSON.stringify(newTask),
-	}).then() // parameter expected?
-	///////////////////////////////////////////////////
+	}).then(_ => {
 	
-	let img = label.parentElement.lastElementChild;
+	// get task ID
+	recieveID().then(data => {
+	idDiv = document.getElementById("top").nextElementSibling.firstElementChild.nextElementSibling;
+	idDiv.innerHTML = data;
+	idDiv.id = data;
+	
+	let img = idDiv.parentElement.lastElementChild;
 	img.innerHTML = '<img src="static/cross.png" style="width:50%"></img>'
 	
 	let doneButton = img.previousSibling;
-	doneButton.innerHTML = `<button class="btn-light" onclick="doneTask(${id})">Done!</button>`
+	doneButton.innerHTML = `<button class="btn-light" onclick="doneTask(${data})">Done!</button>
+							<button class="btn-light" onclick="deleteTask(${data})">Delete</button>`
+	});
+	});
 }
 
+async function recieveID() {
+	response = await fetch('/add', {
+		"method": "GET",
+		"headers": {"Content-Type": "application/json"},
+	})		
+			
+	data = await response.json();
+    return data;
+}
+
+// id is Number
 function doneTask(id) {
 	
 	// the number in the ID column on the website
 	let taskNumber = document.getElementById(id);
-	
+
 	let state = taskNumber.parentElement.lastElementChild;
 	state.innerHTML = '<img src="static/checked.png" style="width:50%"></img>'
 	
@@ -126,19 +147,17 @@ function doneTask(id) {
 	btn.innerHTML =`<button class="btn-light" onclick="undoTask(${id})">Undo</button>
 					<button class="btn-light" onclick="deleteTask(${id})">Delete</button>`;
 	
-	for (let i of tasks){
-		if (i.id_t == id){
-			i.state = true;
-			
-			// updated info is sent to app.py
-			fetch('/change', {
-				"method": "POST",
-				"headers": {"Content-Type": "application/json"},
-				"body": JSON.stringify(i),
-			}).then()
-			break;
-		}
+	// updated info is sent to app.py
+	let t = {
+		id_t: id,
+		state: true,
 	}
+	
+	fetch('/change', {
+		"method": "POST",
+		"headers": {"Content-Type": "application/json"},
+		"body": JSON.stringify(t),
+	}).then()
 }
 
 function undoTask(id) {
@@ -147,20 +166,19 @@ function undoTask(id) {
 	state.innerHTML = '<img src="static/cross.png" style="width:50%"></img>'
 	
 	let btn = state.previousElementSibling;
-	btn.innerHTML =`<button class="btn-light" onclick="doneTask(${id})">Done!</button>`;
+	btn.innerHTML =`<button class="btn-light" onclick="doneTask(${id})">Done!</button>
+					<button class="btn-light" onclick="deleteTask(${id})">Delete</button>`;
 	
-	for (let i of tasks){
-		if (i.id_t == id){
-			i.state = false;
-			
-			// updated info is sent to app.py
-			fetch('/change', {
-				"method": "POST",
-				"headers": {"Content-Type": "application/json"},
-				"body": JSON.stringify(i),
-			}).then()
-		}
-	}	
+	let t = {
+		id_t: id,
+		state: false,
+	}
+	
+	fetch('/change', {
+		"method": "POST",
+		"headers": {"Content-Type": "application/json"},
+		"body": JSON.stringify(t),
+	}).then()
 }
 
 function deleteTask(id) {
@@ -168,21 +186,11 @@ function deleteTask(id) {
 	let outerDiv = taskNumber.parentElement;
 	outerDiv.remove();
 	
-	for (let i = 0; i < tasks.length; i++){
-		if (tasks[i].id_t == id){
-			
-			// task gets deleted locally
-			tasks.splice(i,1);
-			
-			// app.py also recieves the id of the task to delete
-			fetch('/delete', {
-				"method": "POST",
-				"headers": {"Content-Type": "application/json"},
-				"body": tasks[i].id_t,
-			}).then()
-			break;
-		}
-	}
+	fetch('/delete', {
+		"method": "POST",
+		"headers": {"Content-Type": "application/json"},
+		"body": JSON.stringify(id),
+	}).then()
 }
 
 // date_s - string
@@ -207,15 +215,7 @@ function timeWithoutDate(date_s){
 	}
 	return 'Not set'
 }
-function loadTasks(){
-	
-	// load, save, and add task can't be done unless the current task is confirmed
-	let inputField = document.getElementById('in');
-	if (inputField != undefined) {
-		flashContinueButton(inputField);
-		return;
-	}
-	
+function loadTasks(){	
 	fetch('/load', {
 		"method": "GET",
 		"headers": {"Content-Type": "application/json"},
@@ -238,17 +238,18 @@ function loadTasks(){
 				cells.push(new_cell);
 			}
 			cells[2].className = "col-sm-6";
-			cells[1].id = ++id;
-			cells[1].innerHTML = id;
+			cells[1].id = d[0];
+			cells[1].innerHTML = d[0];
 			cells[2].innerHTML = d[1];
 			cells[3].innerHTML = dateWithoutTime(d[2]);
 			cells[4].innerHTML = timeWithoutDate(d[2]);
 			
 			// these depend on the state
 			cells[5].innerHTML = (d[3]) ?
-			`<button class="btn-light" onclick="undoTask(${id})">Undo</button>
-			<button class="btn-light" onclick="deleteTask(${id})">Delete</button>` :
-			`<button class="btn-light" onclick="doneTask(${id})">Done!</button>`;
+			`<button class="btn-light" onclick="undoTask(${d[0]})">Undo</button>
+			<button class="btn-light" onclick="deleteTask(${d[0]})">Delete</button>` :
+			`<button class="btn-light" onclick="doneTask(${d[0]})">Done!</button>
+			<button class="btn-light" onclick="deleteTask(${d[0]})">Delete</button>`;
 			cells[6].innerHTML = (d[3]) ? 
 			'<img src="static/checked.png" style="width:50%"></img>' : 
 			'<img src="static/cross.png" style="width:50%"></img>';
@@ -261,32 +262,9 @@ function loadTasks(){
 			title.after(new_line);
 			
 			// save tasks locally in Array
-			let newTask = new Task(id, d[1], new Date( Date.parse(d[2]) ), d[3]);
+			let newTask = new Task(d[0], d[1], new Date( Date.parse(d[2]) ), d[3]);
 			tasks.push(newTask);
 
 		};
 	})	
-}
-
-function saveTasks(){
-	
-	// load, save, and add task can't be done unless the current task is confirmed
-	let inputField = document.getElementById('in');
-	if (inputField != undefined) {
-		flashContinueButton(inputField);
-		return;
-	}
-	
-	fetch('/save', {
-		"method": "POST",
-		"headers": {"Content-Type": "application/json"},
-		"body": JSON.stringify(tasks),
-	}).then()
-	
-	let title = document.getElementById('top');
-	for (let i = 0; i < tasks.length; i++) {
-		let taskLine = title.nextElementSibling;
-		taskLine.remove();
-	}
-	tasks.length = 0;
 }
