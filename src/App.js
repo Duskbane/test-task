@@ -1,0 +1,207 @@
+import React, { useState } from 'react';
+import { useEffect } from 'react';
+import cross from './cross.png';
+import tick from './checked.png';
+
+function Header () {
+		return(
+		<div className="row border m">
+			<div className="col-sm-1"></div>
+			<div className="col-sm-1"><h5>ID</h5></div>
+			<div className="col-sm-6"><h5>Task</h5></div>
+			<div className="col-sm-1"><h5>Date</h5></div>
+			<div className="col-sm-1"><h5>Time</h5></div>
+			<div className="col-sm-1"><h5></h5></div>
+			<div className="col-sm-1"><h5>State</h5></div>
+		</div>
+		);
+	}
+	
+function TodoItem({ task, deleteTask, toggleCompleted }) {
+	function handleChange() {
+		toggleCompleted(task.id);
+	}
+	return (
+	<>
+		<div className="row border m">
+			<div className="col-sm-1"></div>
+			<div className="col-sm-1"><h5>{task.id}</h5></div>
+			<div className="col-sm-6">
+				<p className="lab">{task.text}</p>
+			</div>
+			<div className="col-sm-1"><h5>{dateWithoutTime(task.date)}</h5></div>
+			<div className="col-sm-1"><h5>{timeWithoutDate(task.date)}</h5></div>
+			<div className="col-sm-1">
+				<button className="btn-light" onClick={() => handleChange(task.id)}>Change</button>
+				<button className="btn-light" onClick={() => deleteTask(task.id)}>Delete</button>
+			</div>
+			<StateImage s={task.completed} />
+		</div>
+	</>
+	);
+}
+function TodoList() {
+	const [tasks, setTasks] = useState('');
+	let [text, setText] = useState('');
+	
+	useEffect(()=>{
+		loadTasks();
+	},[])
+	
+	function loadTasks(){	
+		fetch('http://localhost:5000/load', {
+			"method": "GET",
+			"headers": {"Content-Type": "application/json"},
+		}).then((response) => {
+		  return response.json();
+		})
+		.then((data) => {
+			let taskList = addPreloadedTasks(data);
+			setTasks([...tasks, ...taskList]);
+		})
+	}
+	
+	function addPreloadedTasks(tasks){
+		let taskList = [];
+		for (let i of tasks) {
+			text = i[1];
+			const newTask = {
+				id: i[0],
+				date: i[2],
+				text,
+				completed: i[3]
+			};
+			taskList.push(newTask);
+		}
+		return taskList;
+	}
+	
+	function updateDB(newTask) {
+		fetch('http://localhost:5000/add', {
+			"method": "POST",
+			"headers": {"Content-Type": "application/json"},
+			"body": JSON.stringify(newTask),
+		}).then(_ => {
+			
+		});
+	}
+	
+	async function getID() {
+		let response = await fetch('http://localhost:5000/add', {
+			"method": "GET",
+			"headers": {"Content-Type": "application/json"},
+		})		
+				
+		let data = await response.json();
+		return data;
+	}
+	
+	function addTask(text) {
+		let newTask = {
+			id: '',
+			date: new Date(),
+			text,
+			completed: false
+		};
+		
+		updateDB(newTask);
+		getID().then(data =>{
+			newTask.id = data;
+		});
+		
+		setTasks([...tasks, newTask]);
+		setText('');
+	}
+	
+	function deleteTask(id) {
+		setTasks(tasks.filter(task => task.id !== id));
+		
+		fetch('http://localhost:5000/delete', {
+		"method": "POST",
+		"headers": {"Content-Type": "application/json"},
+		"body": JSON.stringify(id),
+		}).then()
+	}
+	function toggleCompleted(id) {
+		setTasks(Array.from(tasks).map(task => {
+			if (task.id === id) {
+				return {...task, completed: !task.completed};
+			} else {
+				return task;
+			} 
+		}));
+
+		fetch('http://localhost:5000/change', {
+		"method": "POST",
+		"headers": {"Content-Type": "application/json"},
+		"body": JSON.stringify(id),
+		}).then()
+	}
+		
+	return(
+		<>
+			<Header />
+				{Array.from(tasks).map(task => (
+				<TodoItem 
+				key={task.id}
+				task={task}
+				deleteTask={deleteTask}
+				toggleCompleted={toggleCompleted}
+				/>))}
+			<div className="text-center pt-5">
+				<input
+				value={text}
+				onChange={e => setText(e.target.value)} 
+				placeholder="What do you want to do?" 
+				/>
+			</div>
+			<div className="text-center">
+			<button className="btn-light" onClick={() => addTask(text)}>Add task</button>
+			</div>
+		</>
+	);
+}
+function App() {
+	return (
+		<TodoList />
+	); 
+}
+export default App;
+
+
+
+function dateWithoutTime(date_s){
+		if (date_s != null){
+			let date = new Date( Date.parse(date_s) );
+			let withoutTime = showNumbersBelowTenWithLeadingZero(date.getDate()) + '/' + 
+				   showNumbersBelowTenWithLeadingZero(date.getMonth() + 1) +
+				   '/' + date.getFullYear();
+			return withoutTime;
+		}
+		return 'Not set'
+}	
+
+function timeWithoutDate(date_s){
+	if (date_s != null){
+		let date = new Date( Date.parse(date_s) );
+		let withoutDate = showNumbersBelowTenWithLeadingZero(date.getHours()) + ':' + 
+			   showNumbersBelowTenWithLeadingZero(date.getMinutes()) +
+			   ':' + showNumbersBelowTenWithLeadingZero(date.getSeconds());
+		return withoutDate;
+	}
+	return 'Not set'
+}
+
+function showNumbersBelowTenWithLeadingZero(time) {
+	if (time > 9)
+		return time;
+	else
+		return "0" + time;
+}
+
+function StateImage({s}) {
+	if (s === true) 
+		return <div className="col-sm-1"><h5><img className="im" src={tick} /></h5></div>
+	else 
+		return <div className="col-sm-1"><h5><img className="im" src={cross} /></h5></div>
+}

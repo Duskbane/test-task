@@ -1,8 +1,10 @@
-from flask import Flask, request, render_template
-import psycopg2 
+from flask import Flask, request
 import json
+import psycopg2 
+from flask_cors import CORS, cross_origin
 
 app = Flask(__name__)
+CORS(app)
 
 # =============================================================================
 # DATABASE-RELATED
@@ -10,7 +12,7 @@ app = Flask(__name__)
 
 # for convenience
 # can be used with different users (settings.dat file)
-global databaseInfo
+
 databaseInfo = []
 
 def createNewDatabase(cursor):
@@ -60,11 +62,10 @@ def initDatabase():
     
     conn.close()
     f.close()
-    
+
 # =============================================================================
 # APP-RELATED
 # =============================================================================
-
 class Task:
     def __init__(self, id_t, info, date, state):
         self.id = id_t
@@ -78,23 +79,19 @@ class Task:
 
 def getTaskDataFromRequest(req):
     # req - json file from website containing task info
-    taskID = req["id_t"]
+    taskID = req["id"]
     taskText = req["text"]
     taskDate = req["date"]
-    taskState = req["state"]
+    taskState = req["completed"]
     return Task(taskID, taskText, taskDate, taskState)
 
 # declared global as it changes in multiple functions in different ways
 taskList = []
 
-@app.route('/', methods=['GET'])
-def gets():
-    # probably wrong return, but an error is given with empty one
-    # same applies to functions below
-    return render_template("ToDo.html") 
-
 @app.route('/add', methods=['POST', 'GET'])
+@cross_origin()
 def getTask():
+
     if request.method == 'POST':
         requestData = request.get_json()
         
@@ -107,7 +104,7 @@ def getTask():
                         VALUES ('%s', '%s', %s);" %(newTask.info, newTask.date, newTask.state))
         conn.close()
         
-        return render_template("ToDo.html")
+        return "<></>"
     # id
     if request.method == 'GET':
         conn = connectToDatabase(databaseInfo)
@@ -120,22 +117,29 @@ def getTask():
         return json.dumps(task[0])
 
 @app.route('/change', methods=['POST'])
+@cross_origin()
 def changeState():
+
     requestData = request.get_json()
 
     conn = connectToDatabase(databaseInfo)
     cursor = conn.cursor()
     
     cursor.execute("UPDATE tasks \
-                    SET state = ('%s') \
+                    SET state = CASE  \
+                    WHEN state = TRUE THEN FALSE \
+                    ELSE TRUE \
+                    END \
                     WHERE id = ('%s'); \
-                    " %( requestData['state'], int(requestData['id_t'])) )
+                    " %( requestData ))
 
     conn.close()
-    return render_template("ToDo.html")
+    return "<></>"
 
 @app.route('/delete', methods=['POST'])
+@cross_origin()
 def deleteTask():
+
     requestData = request.get_json()
     
     # this time request only returns id
@@ -145,11 +149,12 @@ def deleteTask():
     cursor = conn.cursor()
     cursor.execute("DELETE FROM tasks WHERE id = ('%s');" %(taskIDToDelete))
 
-    return render_template("ToDo.html")
+    return "<></>"
 
 @app.route('/load', methods=['GET'])
+@cross_origin()
 def loadTasks():
-    
+
     conn = connectToDatabase(databaseInfo)
     cursor = conn.cursor()
     
@@ -182,11 +187,11 @@ def datetimeToDateObjectFormat(date):
         # YYYY-MM-DDTHH:mm:ss.sssZ
         return newdate[:10] + 'T' + newdate[11:23] + newdate[26:]
     return None
+
 # =============================================================================
-# START
+# 
 # =============================================================================
 
 if(__name__ == "__main__"):
-    
     initDatabase()
     app.run()
